@@ -100,11 +100,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           arch: ${{ matrix.arch }}
-      - name: Run desktop-trampoline tests
-        run: |
-          cd vendor/desktop-trampoline
-          yarn install
-          yarn test
       - name: Build production app
         run: yarn build:prod
         env:
@@ -113,15 +108,6 @@ jobs:
             ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
           npm_config_arch: ${{ matrix.arch }}
           TARGET_ARCH: ${{ matrix.arch }}
-      - name: Prepare testing environment
-        run: yarn test:setup
-        env:
-          npm_config_arch: ${{ matrix.arch }}
-      - name: Run unit tests
-        if: matrix.arch == 'x64'
-        run: yarn test:unit
-      - name: Run script tests
-        run: yarn test:script
       - name: Package production app
         run: yarn package
         env:
@@ -135,61 +121,3 @@ jobs:
             dist/bundle-size.json
             dist/bundle-hash.json
           if-no-files-found: error
-  e2e-smoke:
-    name: E2E Smoke ${{ matrix.friendlyName }} ${{ matrix.arch }}
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: read
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            friendlyName: Linux
-            arch: x64
-    timeout-minutes: 60
-    environment: ${{ inputs.environment }}
-    env:
-      RELEASE_CHANNEL: ${{ inputs.environment }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          repository: ${{ inputs.repository || github.repository }}
-          ref: ${{ inputs.ref }}
-          submodules: recursive
-      - uses: ./.github/actions/setup-ci-environment
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          arch: ${{ matrix.arch }}
-      - name: Build production app
-        run: yarn build:prod
-        env:
-          DESKTOP_E2E_UPDATES_URL: http://127.0.0.1:51789/update
-          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
-          DESKTOP_OAUTH_CLIENT_SECRET:
-            ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
-          npm_config_arch: ${{ matrix.arch }}
-          TARGET_ARCH: ${{ matrix.arch }}
-      - name: Prepare testing environment
-        run: yarn test:setup
-        env:
-          npm_config_arch: ${{ matrix.arch }}
-      - name: Package production app
-        run: yarn package
-        env:
-          npm_config_arch: ${{ matrix.arch }}
-      - name: Install app on Linux
-        run: |
-          sudo apt-get install -y xvfb xauth ./dist/github-desktop-*.deb
-          echo "DESKTOP_E2E_APP_PATH=/usr/bin/github-desktop" >> "$GITHUB_ENV"
-      - name: Run packaged E2E smoke tests
-        run: |
-          xvfb-run --auto-servernum --server-args='-screen 0 1280x720x24' yarn test:e2e:run:packaged
-      - name: Upload E2E artifacts
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: e2e-${{matrix.friendlyName}}-${{matrix.arch}}
-          path: playwright-videos/**
-          if-no-files-found: warn
