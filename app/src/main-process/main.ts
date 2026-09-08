@@ -56,6 +56,29 @@ import { CLIAction } from '../lib/cli-action'
 app.setAppLogsPath()
 enableSourceMaps()
 
+function isKDESession() {
+  const desktop = `${process.env.XDG_CURRENT_DESKTOP ?? ''}:${
+    process.env.DESKTOP_SESSION ?? ''
+  }`.toLowerCase()
+
+  return (
+    desktop.includes('kde') ||
+    desktop.includes('plasma') ||
+    process.env.KDE_FULL_SESSION === 'true'
+  )
+}
+
+if (__LINUX__ && isKDESession()) {
+  // Enable KDE's GTK application-menu bridge.
+  process.env.GTK_MODULES = process.env.GTK_MODULES
+    ? `${process.env.GTK_MODULES}:appmenu-gtk-module`
+    : 'appmenu-gtk-module'
+  process.env.UBUNTU_MENUPROXY ??= '1'
+
+  // Use XWayland for KDE application menus.
+  app.commandLine.appendSwitch('ozone-platform', 'x11')
+}
+
 let mainWindow: AppWindow | null = null
 
 const launchTime = now()
@@ -333,6 +356,16 @@ app.on('ready', () => {
 
   possibleProtocols.forEach(protocol => setAsDefaultProtocolClient(protocol))
 
+  // Register the menu before creating the first window.
+  Menu.setApplicationMenu(
+    buildDefaultMenu({
+      selectedShell: null,
+      selectedExternalEditor: null,
+      askForConfirmationOnRepositoryRemoval: false,
+      askForConfirmationOnForcePush: false,
+    })
+  )
+
   createWindow()
 
   const orderedWebRequest = new OrderedWebRequest(
@@ -349,15 +382,6 @@ app.on('ready', () => {
   // Adds an authorization header for requests of avatars on GHES and private
   // repo assets
   const updateAccounts = installAuthenticatedImageFilter(orderedWebRequest)
-
-  Menu.setApplicationMenu(
-    buildDefaultMenu({
-      selectedShell: null,
-      selectedExternalEditor: null,
-      askForConfirmationOnRepositoryRemoval: false,
-      askForConfirmationOnForcePush: false,
-    })
-  )
 
   ipcMain.on('update-accounts', (_, accounts) => updateAccounts(accounts))
 

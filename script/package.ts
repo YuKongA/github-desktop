@@ -29,7 +29,6 @@ import {
   mkdirSync,
   readdirSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'fs'
 import { getVersion } from '../app/package-info'
@@ -205,9 +204,25 @@ function packageLinux() {
       recursive: true,
       verbatimSymlinks: true,
     })
-    symlinkSync(
-      '../lib/github-desktop/desktop',
-      join(binaryDir, 'github-desktop')
+    writeFileSync(
+      join(binaryDir, 'github-desktop'),
+      `#!/bin/sh\n` +
+        `set -eu\n` +
+        `desktop_environment="${'${XDG_CURRENT_DESKTOP:-}'}:${'${DESKTOP_SESSION:-}'}:${'${KDE_FULL_SESSION:-}'}"\n` +
+        `case "$desktop_environment" in\n` +
+        `  *KDE*|*kde*|*Plasma*|*plasma*|*:true)\n` +
+        `    case ":${'${GTK_MODULES:-}'}:" in\n` +
+        `      *:appmenu-gtk-module:*) ;;\n` +
+        `      ::) GTK_MODULES=appmenu-gtk-module ;;\n` +
+        `      *) GTK_MODULES="${'${GTK_MODULES}'}:appmenu-gtk-module" ;;\n` +
+        `    esac\n` +
+        `    export GTK_MODULES\n` +
+        `    export UBUNTU_MENUPROXY="${'${UBUNTU_MENUPROXY:-1}'}"\n` +
+        `    set -- --ozone-platform=x11 "$@"\n` +
+        `    ;;\n` +
+        `esac\n` +
+        `exec "$(dirname "$0")/../lib/github-desktop/desktop" "$@"\n`,
+      { mode: 0o755 }
     )
     cpSync(
       join(__dirname, '../app/static/linux/icon-logo.png'),
@@ -234,7 +249,7 @@ function packageLinux() {
         `Section: devel\n` +
         `Priority: optional\n` +
         `Architecture: ${getLinuxDebianArchitecture()}\n` +
-        `Depends: ca-certificates, libasound2 | libasound2t64, libc6, libdrm2, libgbm1, libgtk-3-0 | libgtk-3-0t64, libnspr4, libnss3, libsecret-1-0, libx11-6, libxcb1, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxrandr2, libxss1, libxtst6, xdg-utils\n` +
+        `Depends: appmenu-gtk3-module, ca-certificates, libasound2 | libasound2t64, libc6, libdrm2, libgbm1, libgtk-3-0 | libgtk-3-0t64, libnspr4, libnss3, libsecret-1-0, libx11-6, libxcb1, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxrandr2, libxss1, libxtst6, xdg-utils\n` +
         `Maintainer: GitHub, Inc. <opensource+desktop@github.com>\n` +
         `Description: Simple collaboration from your desktop\n` +
         ` GitHub Desktop is a desktop client for GitHub.\n`
