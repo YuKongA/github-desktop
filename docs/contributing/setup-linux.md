@@ -6,6 +6,7 @@ You will need to install these tools on your machine:
  - Yarn
  - Python 3
  - Electron dependencies
+ - `dpkg-deb` for building Debian packages
 
 ## Node.js
 
@@ -59,6 +60,12 @@ $ sudo dnf install -y libsecret-devel libXScrnSaver
 
 ```shellsession
 $ sudo apt install libsecret-1-dev libgconf-2-4
+```
+
+To build a `.deb` package, also install `dpkg`:
+
+```shellsession
+$ sudo apt install dpkg
 ```
 
 ## Back to setup

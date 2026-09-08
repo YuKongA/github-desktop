@@ -81,13 +81,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14-xlarge, windows-2022]
+        os: [macos-14-xlarge, windows-2022, ubuntu-24.04]
         arch: [x64, arm64]
         include:
           - os: macos-14-xlarge
             friendlyName: macOS
           - os: windows-2022
             friendlyName: Windows
+          - os: ubuntu-24.04
+            friendlyName: Linux
     timeout-minutes: 60
     environment: ${{ inputs.environment }}
     env:
@@ -155,6 +157,7 @@ jobs:
             dist/GitHubDesktop-*.nupkg
             dist/GitHubDesktopSetup-${{matrix.arch}}.exe
             dist/GitHubDesktopSetup-${{matrix.arch}}.msi
+            dist/github-desktop-*.deb
             dist/bundle-size.json
             dist/bundle-hash.json
           if-no-files-found: error

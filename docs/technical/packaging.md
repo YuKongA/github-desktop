@@ -107,8 +107,28 @@ Other things to note about the Windows packaging process:
 
 ### Linux
 
-Refer to the [`shiftkey/desktop`](https://github.com/shiftkey/desktop) fork
-for packaging details about Linux.
+Linux builds are packaged as Debian packages. The package contains the
+Electron application under `/usr/lib/github-desktop`, a `github-desktop`
+launcher in `/usr/bin`, and a desktop entry and icon.
+
+Install `dpkg-deb` before packaging. On Debian or Ubuntu this is provided by
+the `dpkg` package:
+
+```shellsession
+$ sudo apt install dpkg
+```
+
+Then build and package the application from the repository root:
+
+```shellsession
+$ NODE_ENV=production RELEASE_CHANNEL=production yarn build:prod
+$ NODE_ENV=production RELEASE_CHANNEL=production yarn package
+```
+
+The resulting package is written to `dist/github-desktop-<version>-<arch>.deb`.
+The supported architectures are `amd64` and `arm64`; set `TARGET_ARCH` and
+`npm_config_arch` when cross-building. Release and beta builds should set
+`RELEASE_CHANNEL` to the corresponding release channel.
 
 ## `script/publish.ts`
 

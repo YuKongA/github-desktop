@@ -40,6 +40,18 @@ export function getOSXZipPath() {
   return Path.join(getDistPath(), '..', getOSXZipName())
 }
 
+export function getLinuxDebianArchitecture(): 'amd64' | 'arm64' {
+  return getDistArchitecture() === 'x64' ? 'amd64' : 'arm64'
+}
+
+export function getLinuxDebName() {
+  return `github-desktop-${version}-${getLinuxDebianArchitecture()}.deb`
+}
+
+export function getLinuxDebPath() {
+  return Path.join(getDistRoot(), getLinuxDebName())
+}
+
 export function getWindowsInstallerName() {
   const productName = getExecutableName()
   return `${productName}Setup-${getDistArchitecture()}.msi`

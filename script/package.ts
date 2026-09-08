@@ -17,9 +17,21 @@ import {
   getDistRoot,
   getDistArchitecture,
   getIconDirectory,
+  getLinuxDebPath,
+  getLinuxDebianArchitecture,
 } from './dist-info'
 import { isGitHubActions } from './build-platforms'
-import { existsSync, rmSync, writeFileSync } from 'fs'
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'fs'
 import { getVersion } from '../app/package-info'
 import { computeBundleHashSync } from '../app/src/lib/compute-bundle-hash'
 import { rename } from 'fs/promises'
@@ -40,6 +52,8 @@ if (process.platform === 'darwin') {
   packageOSX()
 } else if (process.platform === 'win32') {
   packageWindows()
+} else if (process.platform === 'linux') {
+  packageLinux()
 } else {
   console.error(`I don't know how to package for ${process.platform} :(`)
   process.exit(1)
@@ -158,4 +172,117 @@ function packageWindows() {
       console.error(`Error packaging: ${e}`)
       process.exit(1)
     })
+}
+
+function packageLinux() {
+  const stagingDir = join(outputDir, `.github-desktop-deb-${process.pid}`)
+  const debPath = getLinuxDebPath()
+  const applicationDir = join(stagingDir, 'usr', 'lib', 'github-desktop')
+  const binaryDir = join(stagingDir, 'usr', 'bin')
+  const desktopEntryDir = join(stagingDir, 'usr', 'share', 'applications')
+  const iconDir = join(
+    stagingDir,
+    'usr',
+    'share',
+    'icons',
+    'hicolor',
+    '512x512',
+    'apps'
+  )
+  const controlDir = join(stagingDir, 'DEBIAN')
+
+  rmSync(stagingDir, { recursive: true, force: true })
+  rmSync(debPath, { force: true })
+
+  try {
+    mkdirSync(applicationDir, { recursive: true })
+    mkdirSync(binaryDir, { recursive: true })
+    mkdirSync(desktopEntryDir, { recursive: true })
+    mkdirSync(iconDir, { recursive: true })
+    mkdirSync(controlDir, { recursive: true })
+
+    cpSync(distPath, applicationDir, {
+      recursive: true,
+      verbatimSymlinks: true,
+    })
+    symlinkSync(
+      '../lib/github-desktop/desktop',
+      join(binaryDir, 'github-desktop')
+    )
+    cpSync(
+      join(__dirname, '../app/static/linux/icon-logo.png'),
+      join(iconDir, 'github-desktop.png')
+    )
+
+    writeFileSync(
+      join(desktopEntryDir, 'github-desktop.desktop'),
+      `[Desktop Entry]\n` +
+        `Name=GitHub Desktop\n` +
+        `Comment=Simple collaboration from your desktop\n` +
+        `Exec=github-desktop %U\n` +
+        `Icon=github-desktop\n` +
+        `Terminal=false\n` +
+        `Type=Application\n` +
+        `Categories=Development;RevisionControl;\n` +
+        `StartupWMClass=GitHub Desktop\n`
+    )
+
+    writeFileSync(
+      join(controlDir, 'control'),
+      `Package: github-desktop\n` +
+        `Version: ${getDebianVersion(getVersion())}\n` +
+        `Section: devel\n` +
+        `Priority: optional\n` +
+        `Architecture: ${getLinuxDebianArchitecture()}\n` +
+        `Depends: ca-certificates, libasound2 | libasound2t64, libc6, libdrm2, libgbm1, libgtk-3-0 | libgtk-3-0t64, libnspr4, libnss3, libsecret-1-0, libx11-6, libxcb1, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxrandr2, libxss1, libxtst6, xdg-utils\n` +
+        `Maintainer: GitHub, Inc. <opensource+desktop@github.com>\n` +
+        `Description: Simple collaboration from your desktop\n` +
+        ` GitHub Desktop is a desktop client for GitHub.\n`
+    )
+
+    normalizePackagePermissions(stagingDir)
+
+    console.log('Packaging for Linux (.deb)…')
+    cp.execFileSync(
+      'dpkg-deb',
+      ['--build', '--root-owner-group', stagingDir, debPath],
+      { stdio: 'inherit' }
+    )
+    console.log(`Debian package created at ${debPath}`)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new Error(
+        'Unable to create the Linux package because dpkg-deb was not found. Install the dpkg package and try again.'
+      )
+    }
+    throw error
+  } finally {
+    rmSync(stagingDir, { recursive: true, force: true })
+  }
+}
+
+function normalizePackagePermissions(directory: string) {
+  chmodSync(directory, 0o755)
+
+  for (const entry of readdirSync(directory)) {
+    const entryPath = join(directory, entry)
+    const stats = lstatSync(entryPath)
+
+    if (stats.isSymbolicLink()) {
+      continue
+    }
+
+    if (stats.isDirectory()) {
+      normalizePackagePermissions(entryPath)
+    } else if (stats.isFile()) {
+      chmodSync(entryPath, stats.mode & 0o111 ? 0o755 : 0o644)
+    }
+  }
+}
+
+function getDebianVersion(version: string) {
+  const [release, prerelease] = version.split('-', 2)
+  return prerelease === undefined
+    ? release
+    : `${release}~${prerelease.replaceAll('-', '.')}`
 }
