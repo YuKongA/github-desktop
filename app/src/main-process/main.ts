@@ -264,6 +264,8 @@ async function handleCommandLineArguments(argv: string[]) {
     boolean: ['protocol-launcher'],
   })
 
+  const prefixes = Array.from(possibleProtocols, p => `${p}://`)
+
   // Desktop registers it's protocol handler callback on Windows as
   // `[executable path] --protocol-launcher "%1"`. Note that extra command
   // line arguments might be added by Chromium
@@ -280,11 +282,10 @@ async function handleCommandLineArguments(argv: string[]) {
     // sure that Chromium won't add more switches later on which is why we have
     // to resort to looking through all arguments looking for something that
     // appears to be an app url.
-    const prefixes = Array.from(possibleProtocols, p => `${p}://`)
     const matchingUrl = argv.find(arg => {
       if (prefixes.some(p => arg.startsWith(p))) {
         try {
-          new URL(arg)
+          URL.parse(arg)
           return true
         } catch (e) {
           log.error(`Unable to parse argument as URL: ${arg}`)
@@ -300,6 +301,25 @@ async function handleCommandLineArguments(argv: string[]) {
     }
     // If --protocol-launcher is present we always want to bail and not
     // risk a smuggled cli switch
+    return
+  }
+
+  const matchingUrl = argv.find(arg => {
+    if (!prefixes.some(p => arg.startsWith(p))) {
+      return false
+    }
+
+    try {
+      URL.parse(arg)
+      return true
+    } catch (e) {
+      log.error(`Unable to parse argument as URL: ${arg}`)
+      return false
+    }
+  })
+
+  if (matchingUrl) {
+    handleAppURL(matchingUrl)
     return
   }
 

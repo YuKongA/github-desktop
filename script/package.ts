@@ -239,6 +239,7 @@ function packageLinux() {
         `Terminal=false\n` +
         `Type=Application\n` +
         `Categories=Development;RevisionControl;\n` +
+        `MimeType=x-scheme-handler/x-github-client;x-scheme-handler/x-github-desktop-auth;\n` +
         `StartupWMClass=GitHub Desktop\n`
     )
 
